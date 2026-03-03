@@ -1,0 +1,53 @@
+*{
+    font-family: Arial, Helvetica, sans-serif;
+    box-sizing: border-box;
+}
+
+.content {
+    padding-left: 20px;
+}
+.contact {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+fieldset {
+    border-radius: 10px;
+    margin: 20px;
+    border: none;
+    background-color: #fffbe2;
+    padding: 20px;
+}
+h3 { 
+    text-align: center;
+
+}
+.form-group {
+    width: 90%;
+    display:fex;
+    flex-direction: column;
+    gap: 20px;
+}
+.row1 {
+    display:flex;
+    gap: 200px;
+}
+#name, #phone, #email, #message {
+    border: none;
+    border-radius: 5px;
+    margin: 5px;
+}
+.submit {
+    text-align: center;
+}
+.submit input {
+    align-items: center;
+    text-align: center;
+    cursor: pointer;
+}
+.submit input:hover {
+    color: green;
+    background-color: #519A66;
+    border: none;
+}

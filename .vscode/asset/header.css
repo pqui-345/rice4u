@@ -1,0 +1,273 @@
+/* ================================================================
+   RICE4U — HEADER.CSS  (Đồng bộ toàn site)
+   Font  : Be Vietnam Pro + Playfair Display
+   Màu   : --green-dark #237227 | --green-mid #519A66 | --amber #FFAA00
+================================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Be+Vietnam+Pro:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --green-dark : #237227;
+  --green-mid  : #519A66;
+  --amber      : #FFAA00;
+  --cream      : #FFD786;
+  --cream-bg   : #fffbe2;
+  --white      : #FFFFFF;
+  --gray-light : #F5F5F5;
+  --text-dark  : #1a2e1a;
+  --text-mid   : #4a5e4a;
+  --header-h   : 72px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0; padding: 0;
+}
+
+body {
+  font-family: 'Be Vietnam Pro', Arial, Helvetica, sans-serif;
+  color: var(--text-dark);
+  background: var(--white);
+  padding-top: var(--header-h); /* offset header fixed */
+}
+
+/* Trang auth dùng grid — thêm class="auth-page" vào <body> */
+body.auth-page {
+  padding-top: 0;
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas: "header" "main" "footer";
+}
+body.auth-page header {
+  position: relative;
+  top: auto;
+  grid-area: header;
+}
+
+/* ── HEADER ── */
+header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 200;
+  height: var(--header-h);
+  background: rgba(255, 255, 249, 0.97);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-bottom: 1px solid rgba(35,114,39,0.10);
+  box-shadow: 0 2px 24px rgba(35,114,39,0.07);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 3%;
+}
+
+header .logo-navi {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+header .logo {
+  display: flex;
+  align-items: center;
+  padding-right: 18px;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+header .logo img, header img.logo {
+  height: 46px; width: auto;
+  filter: drop-shadow(0 2px 6px rgba(35,114,39,0.14));
+  transition: transform 0.28s ease;
+}
+header .logo img:hover, header img.logo:hover { transform: scale(1.04); }
+
+/* Nav */
+header nav { display: flex; align-items: center; }
+header nav ul, header ul.dieu-huong {
+  display: flex; list-style: none; gap: 2px; align-items: center;
+}
+header nav ul li, header ul.dieu-huong li { list-style: none; }
+
+header nav ul li a, header ul.dieu-huong li a {
+  display: block;
+  padding: 7px 13px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--text-mid);
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-weight: 500;
+  font-size: 0.88rem;
+  letter-spacing: 0.02em;
+  transition: color 0.22s, background 0.22s;
+  position: relative;
+}
+header nav ul li a::after, header ul.dieu-huong li a::after {
+  content: '';
+  position: absolute;
+  bottom: 3px; left: 13px; right: 13px;
+  height: 2px; background: var(--green-dark);
+  border-radius: 2px;
+  transform: scaleX(0);
+  transition: transform 0.26s ease;
+}
+header nav ul li a:hover, header ul.dieu-huong li a:hover {
+  color: var(--green-dark);
+  background: rgba(35,114,39,0.06);
+}
+header nav ul li a:hover::after,
+header ul.dieu-huong li a:hover::after { transform: scaleX(1); }
+header nav ul li a.active, header ul.dieu-huong li a.active {
+  color: var(--green-dark); font-weight: 600;
+}
+
+/* Search */
+.search-box {
+  display: flex; align-items: center;
+  border: 1.5px solid rgba(35,114,39,0.15);
+  border-radius: 100px;
+  background: var(--gray-light);
+  margin-left: 16px; overflow: hidden;
+  transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
+}
+.search-box:focus-within {
+  border-color: var(--green-mid);
+  box-shadow: 0 0 0 3px rgba(81,154,102,0.12);
+  background: var(--white);
+}
+.search-box input[type="text"] {
+  border: none; background: transparent;
+  padding: 8px 16px;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-size: 0.84rem; color: var(--text-dark);
+  outline: none; width: 200px;
+}
+.search-box button.search {
+  border: none; background: transparent;
+  padding: 8px 14px; cursor: pointer;
+  display: flex; align-items: center;
+  color: var(--text-mid); transition: color 0.2s;
+}
+.search-box button.search:hover { color: var(--green-dark); }
+.search-box button.search i { font-size: 14px; }
+
+/* User area */
+.user {
+  display: flex; align-items: center;
+  gap: 8px; padding: 0 4px;
+}
+
+.login-button, .signup-button {
+  border-radius: 100px;
+  padding: 7px 17px;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-size: 0.82rem; font-weight: 600;
+  cursor: pointer; transition: all 0.25s;
+  white-space: nowrap; letter-spacing: 0.02em; line-height: 1;
+}
+.login-button {
+  background: transparent;
+  border: 1.5px solid var(--green-mid);
+  color: var(--green-mid);
+}
+.login-button:hover { background: var(--green-mid); color: white; }
+.signup-button {
+  background: var(--green-dark);
+  border: 1.5px solid var(--green-dark);
+  color: white;
+  box-shadow: 0 4px 14px rgba(35,114,39,0.25);
+}
+.signup-button:hover {
+  background: #1a5c1e; border-color: #1a5c1e;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(35,114,39,0.30);
+}
+
+/* Link <a> bên trong nút — không override màu nền */
+.login-button a, .signup-button a {
+  color: inherit !important; text-decoration: none;
+  font-size: inherit; font-weight: inherit;
+  padding: 0; border-radius: 0;
+  display: inline; background: transparent;
+  letter-spacing: inherit; position: static;
+}
+.login-button a::after, .signup-button a::after { display: none !important; }
+
+/* Icons */
+.icon {
+  display: flex; align-items: center;
+  gap: 2px; margin-left: 4px;
+}
+.icon a {
+  position: relative; color: var(--text-mid);
+  text-decoration: none;
+  display: flex; align-items: center; justify-content: center;
+}
+header .fa-solid {
+  font-size: 1.1rem; padding: 10px;
+  color: var(--text-mid); transition: color 0.2s;
+}
+header .fa-solid:hover { color: var(--green-dark); }
+
+/* Badge giỏ hàng */
+.soluong {
+  position: absolute; top: 2px; right: 2px;
+  background: #ee4d2d; color: white !important;
+  font-size: 9px; font-weight: 700;
+  width: 16px; height: 16px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1; border: 1.5px solid white;
+}
+
+/* User dropdown */
+.user-icon { position: relative; display: inline-block; }
+.log-out {
+  display: none;
+  position: absolute; top: calc(100% + 10px); right: 0;
+  background: white; min-width: 190px;
+  box-shadow: 0 14px 44px rgba(0,0,0,0.13);
+  padding: 10px; z-index: 1000;
+  border-radius: 14px;
+  border: 1px solid rgba(35,114,39,0.08);
+}
+.user-icon:hover .log-out { display: block; }
+.log-out a {
+  display: block; padding: 9px 12px;
+  font-size: 0.84rem; font-weight: 500;
+  color: var(--text-dark); text-decoration: none;
+  border-radius: 8px; transition: background 0.2s;
+}
+.log-out a:hover { background: var(--gray-light); color: var(--green-dark); }
+.log-out a::after { display: none !important; }
+.logout-button {
+  width: 100%; background: #ee4d2d; color: white;
+  border: none; padding: 9px 12px; margin-top: 6px;
+  cursor: pointer; border-radius: 8px;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-size: 0.82rem; font-weight: 600;
+  transition: background 0.2s; text-align: left;
+}
+.logout-button:hover { background: #c43010; }
+
+.banner { width: 100%; height: auto; display: block; }
+
+/* Hamburger */
+.menu {
+  display: none; background: none; border: none;
+  font-size: 26px; color: var(--green-dark);
+  cursor: pointer; padding: 4px;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 1100px) {
+  .search-box input[type="text"] { width: 140px; }
+}
+@media (max-width: 860px) {
+  header nav, .search-box { display: none; }
+  .menu { display: block; }
+}
+@media (max-width: 600px) {
+  :root { --header-h: 60px; }
+  header { padding: 0 14px; }
+  .login-button, .signup-button { padding: 6px 12px; font-size: 0.75rem; }
+  header .logo img, header img.logo { height: 36px; }
+}

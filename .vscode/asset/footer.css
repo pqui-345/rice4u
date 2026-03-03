@@ -1,0 +1,91 @@
+/* ================================================================
+   RICE4U — FOOTER.CSS  (Đồng bộ toàn site)
+================================================================ */
+
+footer {
+  background: var(--cream-bg, #fffbe2);
+  border-top: 1px solid rgba(35,114,39,0.10);
+  padding: 40px 5% 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 32px;
+}
+
+footer .footer-column { min-width: 140px; }
+
+footer .logo {
+  height: 52px; width: auto;
+  filter: drop-shadow(0 2px 6px rgba(35,114,39,0.12));
+}
+
+footer h3 {
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--green-dark, #237227);
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--cream, #FFD786);
+  display: inline-block;
+}
+
+footer ul {
+  list-style: none; padding: 0; margin: 0;
+}
+footer ul li { margin-bottom: 8px; }
+
+footer ul li a,
+footer a {
+  color: var(--text-mid, #4a5e4a);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 400;
+  line-height: 1.6;
+  transition: color 0.22s;
+}
+footer ul li a:hover, footer a:hover {
+  color: var(--green-dark, #237227);
+  text-decoration: underline;
+}
+
+/* Cột liên hệ / mạng xã hội */
+footer .media { min-width: 200px; }
+footer .media p {
+  display: flex; align-items: flex-start; gap: 8px;
+  color: var(--text-mid, #4a5e4a);
+  font-size: 0.85rem; line-height: 1.6;
+  margin-bottom: 7px;
+}
+footer .media p i {
+  color: var(--green-mid, #519A66);
+  margin-top: 2px; flex-shrink: 0;
+}
+
+/* Footer-link (dùng trong trang auth) */
+.footer-link {
+  text-align: center;
+  font-size: 0.92rem;
+  margin-top: 1.8em;
+  color: var(--text-mid, #4a5e4a);
+}
+.footer-link a {
+  color: var(--green-mid, #519A66);
+  text-decoration: none;
+  font-weight: 600;
+}
+.footer-link a:hover { text-decoration: underline; color: var(--green-dark, #237227); }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 800px) {
+  footer {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 32px 6% 20px;
+    gap: 24px;
+  }
+  footer .logo { height: 42px; }
+}
