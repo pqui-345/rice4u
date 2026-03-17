@@ -16,7 +16,7 @@ footer {
 footer .footer-column { min-width: 140px; }
 
 footer .logo {
-  height: 150px; width: auto;
+  height: 70px; width: auto;
   filter: drop-shadow(0 2px 6px rgba(35,114,39,0.12));
 }
 

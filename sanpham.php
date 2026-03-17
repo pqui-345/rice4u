@@ -1,6 +1,6 @@
 ﻿<?php
 // ============================================================
-// TRANG SẢN PHẨM - rice4u
+// TRANG SẢN PHẨM - rice4u  (có tìm kiếm)
 // ============================================================
 $host     = 'localhost';
 $dbname   = 'rice4u';
@@ -14,8 +14,9 @@ try {
 }
 
 // ── Bộ lọc & phân trang ──
-$loai_filter  = $_GET['loai']   ?? '';
-$sort         = $_GET['sort']   ?? 'ban_chay';
+$loai_filter  = trim($_GET['loai']   ?? '');
+$sort         = trim($_GET['sort']   ?? 'ban_chay');
+$search       = trim($_GET['search'] ?? '');          // ← TÌM KIẾM
 $page         = max(1, (int)($_GET['page'] ?? 1));
 $per_page     = 12;
 $offset       = ($page - 1) * $per_page;
@@ -33,19 +34,29 @@ $order_map = [
 $order_sql = $order_map[$sort] ?? 'sp.luot_ban DESC';
 
 // ── Điều kiện lọc ──
-$where = "WHERE sp.trang_thai = 1";
+$where  = "WHERE sp.trang_thai = 1";
 $params = [];
+
 if ($loai_filter) {
     $where .= " AND sp.id_loai = :loai";
     $params[':loai'] = $loai_filter;
+}
+
+// ── Xử lý tìm kiếm ──
+if ($search !== '') {
+    $where .= " AND (sp.ten_sp LIKE :search OR sp.xuat_xu LIKE :search2 OR sp.mo_ta_ngan LIKE :search3)";
+    $like = '%' . $search . '%';
+    $params[':search']  = $like;
+    $params[':search2'] = $like;
+    $params[':search3'] = $like;
 }
 
 // ── Đếm tổng ──
 $count_sql = "SELECT COUNT(*) FROM sanpham sp $where";
 $stmt = $pdo->prepare($count_sql);
 $stmt->execute($params);
-$total = $stmt->fetchColumn();
-$total_pages = ceil($total / $per_page);
+$total       = (int)$stmt->fetchColumn();
+$total_pages = max(1, ceil($total / $per_page));
 
 // ── Lấy sản phẩm ──
 $sql = "
@@ -68,6 +79,19 @@ $stmt->bindValue(':offset', $offset,   PDO::PARAM_INT);
 $stmt->execute();
 $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// ── Tiêu đề ──
+$ten_loai_hien_tai = 'Tất Cả Sản Phẩm';
+if ($search !== '') {
+    $ten_loai_hien_tai = 'Kết quả tìm kiếm: "' . htmlspecialchars($search) . '"';
+} else {
+    foreach ($loai_list as $l) {
+        if ($l['id_loai'] === $loai_filter) {
+            $ten_loai_hien_tai = $l['ten_loai'];
+            break;
+        }
+    }
+}
+
 function formatGia($gia) {
     return number_format($gia, 0, ',', '.') . '₫';
 }
@@ -75,65 +99,40 @@ function formatGia($gia) {
 function rutGonMoTa($text, $max = 78) {
     $text = trim((string)$text);
     if ($text === '') return '';
-
     if (function_exists('mb_strlen') && function_exists('mb_substr')) {
         return mb_strlen($text, 'UTF-8') > $max
             ? mb_substr($text, 0, $max - 1, 'UTF-8') . '...'
             : $text;
     }
-
-    return strlen($text) > $max
-        ? substr($text, 0, $max - 1) . '...'
-        : $text;
+    return strlen($text) > $max ? substr($text, 0, $max - 1) . '...' : $text;
 }
 
 function resolveImagePath($path, $default = '/rice4u/asset/images/default.jpg') {
     if (empty($path)) return $default;
-
     $path = trim((string)$path);
-    if (preg_match('#^https?://#i', $path)) {
-        return $path;
-    }
-
+    if (preg_match('#^https?://#i', $path)) return $path;
     $normalized = str_replace('\\', '/', ltrim($path, '/'));
     $candidates = [$normalized];
-
-    if (strpos($normalized, 'asset/') !== 0) {
-        $candidates[] = 'asset/' . $normalized;
-    }
-
+    if (strpos($normalized, 'asset/') !== 0) $candidates[] = 'asset/' . $normalized;
     $dot = strrpos($normalized, '.');
     if ($dot !== false) {
         $base = substr($normalized, 0, $dot);
         foreach (['png', 'webp', 'jpeg', 'jpg'] as $ext) {
-            $candidate = $base . '.' . $ext;
-            $candidates[] = $candidate;
-
-            if (strpos($candidate, 'asset/') !== 0) {
-                $candidates[] = 'asset/' . $candidate;
-            }
+            $c = $base . '.' . $ext;
+            $candidates[] = $c;
+            if (strpos($c, 'asset/') !== 0) $candidates[] = 'asset/' . $c;
         }
     }
-
     foreach ($candidates as $candidate) {
         $candidate = ltrim($candidate, '/');
-        $candidateFull = __DIR__ . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $candidate);
-        if (is_file($candidateFull)) {
+        if (is_file(__DIR__ . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $candidate)))
             return '/rice4u/' . $candidate;
-        }
     }
-
     return $default;
 }
 
-// ── Tên loại hiện tại ──
-$ten_loai_hien_tai = 'Tất Cả Sản Phẩm';
-foreach ($loai_list as $l) {
-    if ($l['id_loai'] === $loai_filter) {
-        $ten_loai_hien_tai = $l['ten_loai'];
-        break;
-    }
-}
+$page_title = 'Sản Phẩm – Rice4U';
+$active_nav = 'sanpham';
 include 'includes/header.php';
 ?>
 <!DOCTYPE html>
@@ -146,19 +145,34 @@ include 'includes/header.php';
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Be+Vietnam+Pro:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/rice4u/asset/styles.css">
 <style>
-  /* ── TRANG SẢN PHẨM ── */
   .page-hero {
     background: linear-gradient(135deg, #237227 0%, #519A66 100%);
     padding: 120px 5% 60px;
     text-align: center;
     color: white;
   }
-  .page-hero h1 {
-    font-family: 'Playfair Display', serif;
-    font-size: clamp(2rem, 4vw, 3rem);
-    margin-bottom: 12px;
+  .page-hero h1 { font-family: 'Playfair Display', serif; font-size: clamp(2rem, 4vw, 3rem); margin-bottom: 12px; }
+  .page-hero p  { opacity: 0.85; font-weight: 300; font-size: 1rem; }
+
+  /* Breadcrumb tìm kiếm */
+  .search-result-bar {
+    background: #e8f5e9;
+    border-left: 4px solid #237227;
+    padding: 12px 5%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.9rem;
+    color: #237227;
+    flex-wrap: wrap;
   }
-  .page-hero p { opacity: 0.85; font-weight: 300; font-size: 1rem; }
+  .search-result-bar a {
+    color: #888;
+    text-decoration: none;
+    font-size: 0.85rem;
+    margin-left: auto;
+  }
+  .search-result-bar a:hover { text-decoration: underline; }
 
   .shop-layout {
     display: grid;
@@ -168,223 +182,152 @@ include 'includes/header.php';
     margin: 0 auto;
     padding: 56px 5%;
   }
-
-  /* ── SIDEBAR ── */
   .sidebar { position: sticky; top: 90px; align-self: start; }
-
   .filter-box {
     background: white;
     border-radius: 20px;
     padding: 28px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    box-shadow: 0 4px 24px rgba(0,0,0,.06);
     margin-bottom: 20px;
   }
-  .filter-box h3 {
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: #237227;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-bottom: 18px;
-    padding-bottom: 10px;
-    border-bottom: 2px solid #FFD786;
-  }
-
+  .filter-box h3 { font-size: .85rem; font-weight: 700; color: #237227; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 18px; padding-bottom: 10px; border-bottom: 2px solid #FFD786; }
   .filter-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 14px;
-    border-radius: 12px;
-    cursor: pointer;
-    text-decoration: none;
-    color: #4a5e4a;
-    font-size: 0.88rem;
-    font-weight: 400;
-    transition: all 0.2s;
-    margin-bottom: 4px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; border-radius: 12px; cursor: pointer;
+    text-decoration: none; color: #4a5e4a; font-size: .88rem; font-weight: 400;
+    transition: all .2s; margin-bottom: 4px;
   }
   .filter-item:hover { background: #f0f7f0; color: #237227; }
-  .filter-item.active {
-    background: #237227;
-    color: white;
-    font-weight: 600;
-  }
-  .filter-count {
-    background: rgba(0,0,0,0.08);
-    border-radius: 100px;
-    padding: 2px 8px;
-    font-size: 0.75rem;
-  }
-  .filter-item.active .filter-count { background: rgba(255,255,255,0.25); }
-
-  /* ── MAIN CONTENT ── */
-  .shop-main { }
+  .filter-item.active { background: #237227; color: white; font-weight: 600; }
+  .filter-count { background: rgba(0,0,0,.08); border-radius: 100px; padding: 2px 8px; font-size: .75rem; }
+  .filter-item.active .filter-count { background: rgba(255,255,255,.25); }
 
   .shop-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 28px;
-    flex-wrap: wrap;
-    gap: 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 28px; flex-wrap: wrap; gap: 12px;
   }
-  .shop-toolbar h2 {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.5rem;
-    color: #237227;
-  }
-  .shop-toolbar span {
-    font-size: 0.85rem;
-    color: #888;
-    font-weight: 300;
-  }
-
+  .shop-toolbar h2 { font-family: 'Playfair Display', serif; font-size: 1.5rem; color: #237227; }
+  .shop-toolbar span { font-size: .85rem; color: #888; font-weight: 300; }
   .sort-select {
-    border: 1.5px solid #e0e0e0;
-    border-radius: 100px;
-    padding: 9px 20px;
-    font-family: 'Be Vietnam Pro', sans-serif;
-    font-size: 0.85rem;
-    color: #4a5e4a;
-    background: white;
-    cursor: pointer;
-    outline: none;
-    transition: border-color 0.2s;
+    border: 1.5px solid #e0e0e0; border-radius: 100px;
+    padding: 9px 20px; font-family: 'Be Vietnam Pro', sans-serif;
+    font-size: .85rem; color: #4a5e4a; background: white; cursor: pointer; outline: none;
   }
   .sort-select:focus { border-color: #237227; }
 
   .products-grid-full {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 24px;
   }
 
-  /* Kế thừa product-card từ /rice4u/asset/styles.css */
-
-  /* ── PHÂN TRANG ── */
-  .pagination {
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-    margin-top: 52px;
-    flex-wrap: wrap;
-  }
-  .page-btn {
-    width: 42px; height: 42px;
-    border-radius: 12px;
-    border: 1.5px solid #e0e0e0;
-    background: white;
-    color: #4a5e4a;
-    font-family: 'Be Vietnam Pro', sans-serif;
-    font-size: 0.9rem;
-    font-weight: 500;
-    cursor: pointer;
-    text-decoration: none;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s;
-  }
-  .page-btn:hover { border-color: #237227; color: #237227; }
-  .page-btn.active { background: #237227; border-color: #237227; color: white; }
-  .page-btn.disabled { opacity: 0.4; pointer-events: none; }
-
-  /* ── EMPTY STATE ── */
-  .empty-state {
-    grid-column: 1/-1;
+  /* Trạng thái không tìm thấy */
+  .empty-search {
+    grid-column: 1 / -1;
     text-align: center;
-    padding: 80px 20px;
+    padding: 60px 20px;
     color: #aaa;
   }
-  .empty-state p:first-child { font-size: 3rem; margin-bottom: 16px; }
-  .empty-state p:last-child { font-size: 0.95rem; }
-
-  /* ── HẾT HÀNG ── */
-  .out-of-stock { opacity: 0.6; }
-  .out-of-stock .btn-add {
-    background: #ccc !important;
-    cursor: not-allowed;
-    box-shadow: none;
+  .empty-search h3 { font-size: 1.3rem; margin-bottom: 10px; color: #555; }
+  .empty-search a {
+    display: inline-block; margin-top: 16px;
+    background: #237227; color: white;
+    padding: 10px 24px; border-radius: 30px;
+    text-decoration: none; font-size: .9rem;
   }
 
-  @media (max-width: 900px) {
-    .shop-layout { grid-template-columns: 1fr; }
-    .sidebar { position: static; }
+  /* PRODUCT CARD */
+  .product-card { position: relative; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 3px 16px rgba(0,0,0,.06); transition: transform .25s, box-shadow .25s; }
+  .product-card:hover { transform: translateY(-4px); box-shadow: 0 10px 32px rgba(35,114,39,.12); }
+  .product-card.out-of-stock { opacity: .6; }
+  .product-img-wrap { aspect-ratio: 1/1; overflow: hidden; background: #f5f5f5; cursor: pointer; position: relative; }
+  .product-img-wrap img { width: 100%; height: 100%; object-fit: cover; transition: transform .4s; }
+  .product-card:hover .product-img-wrap img { transform: scale(1.06); }
+  .product-badge { position: absolute; top: 10px; left: 10px; background: var(--amber, #f9a825); color: white; font-size: .7rem; font-weight: 700; padding: 4px 10px; border-radius: 30px; z-index: 2; letter-spacing: .04em; }
+  .product-badge.hot { background: #237227; }
+  .discount-badge { position: absolute; top: 10px; right: 10px; background: #e53935; color: white; font-size: .7rem; font-weight: 700; padding: 4px 8px; border-radius: 6px; z-index: 2; }
+  .product-body--compact { padding: 14px 16px 16px; }
+  .product-name { font-size: .93rem; font-weight: 600; color: #222; margin: 0 0 8px; line-height: 1.35; cursor: pointer; }
+  .product-name:hover { color: #237227; }
+  .product-footer--centered { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .product-price { font-size: 1rem; font-weight: 700; color: #237227; }
+  .btn-add {color: white; border: none; border-radius: 20px; padding: 7px 14px; font-size: .78rem; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background .2s; }
+  .btn-add:hover { background: #1b5e20; }
+  .btn-add--large { padding: 8px 16px; font-size: .82rem; }
+
+  /* Pagination */
+  .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 40px; flex-wrap: wrap; }
+  .pagination a, .pagination span {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; border-radius: 50%;
+    font-size: .88rem; font-weight: 600; text-decoration: none;
+    border: 1.5px solid #e0e0e0; color: #555; transition: all .2s;
   }
+  .pagination a:hover { border-color: #237227; color: #237227; background: #f0f7f0; }
+  .pagination span.active { background: #237227; color: white; border-color: #237227; }
+  .pagination span.dots { border: none; color: #aaa; }
 </style>
 </head>
 <body>
 
-<!-- HEADER -->
-<!-- <header>
-  <a href="trangchu.php" class="logo">
-    <img src="/rice4u/asset/images/logo.png" alt="Rice4U Logo" class="logo-img">
-  </a>
-  <nav>
-    <a href="trangchu.php">Trang Chủ</a>
-    <a href="sanpham.php" style="color:var(--green-dark);font-weight:600;">Sản Phẩm</a>
-    <a href="#">Câu Chuyện Gạo Việt</a>
-    <a href="#">Về Chúng Tôi</a>
-    <a href="#">Liên Hệ</a>
-  </nav>
-  <div class="header-actions">
-    <button class="icon-btn" title="Tìm kiếm">
-      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-    </button>
-    <button class="icon-btn" title="Giỏ hàng" style="position:relative">
-      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
-      <span class="cart-badge">0</span>
-    </button>
-    <a href="#" class="btn-primary" style="padding:11px 24px;font-size:0.82rem;">Đăng Nhập</a>
-  </div>
-</header> -->
-
 <!-- PAGE HERO -->
 <div class="page-hero">
   <h1>🌾 <?= htmlspecialchars($ten_loai_hien_tai) ?></h1>
-  <p>Tìm thấy <strong><?= $total ?></strong> sản phẩm chất lượng cao từ các vùng lúa Việt Nam</p>
+  <p>
+    <?php if ($search !== ''): ?>
+      Tìm thấy <strong><?= $total ?></strong> sản phẩm cho từ khoá "<strong><?= htmlspecialchars($search) ?></strong>"
+    <?php else: ?>
+      Tìm thấy <strong><?= $total ?></strong> sản phẩm chất lượng cao từ các vùng lúa Việt Nam
+    <?php endif; ?>
+  </p>
 </div>
 
-<!-- SHOP LAYOUT -->
+<?php if ($search !== ''): ?>
+<div class="search-result-bar">
+  🔍 Kết quả tìm kiếm cho: <strong>"<?= htmlspecialchars($search) ?>"</strong>
+  <a href="/rice4u/sanpham.php">✕ Xoá tìm kiếm</a>
+</div>
+<?php endif; ?>
+
 <div class="shop-layout">
 
   <!-- SIDEBAR -->
   <aside class="sidebar">
     <div class="filter-box">
       <h3>📦 Loại Gạo</h3>
-
-      <!-- Tất cả -->
       <?php
         $stmt_all = $pdo->query("SELECT COUNT(*) FROM sanpham WHERE trang_thai = 1");
         $total_all = $stmt_all->fetchColumn();
       ?>
-      <a href="sanpham.php?sort=<?= $sort ?>"
+      <a href="sanpham.php?sort=<?= $sort ?><?= $search ? '&search='.urlencode($search) : '' ?>"
          class="filter-item <?= !$loai_filter ? 'active' : '' ?>">
-        Tất Cả
-        <span class="filter-count"><?= $total_all ?></span>
+        Tất Cả <span class="filter-count"><?= $total_all ?></span>
       </a>
-
-      <!-- Từng loại -->
       <?php foreach ($loai_list as $l): ?>
         <?php
-          $stmt_count = $pdo->prepare("SELECT COUNT(*) FROM sanpham WHERE id_loai = ? AND trang_thai = 1");
-          $stmt_count->execute([$l['id_loai']]);
-          $count_loai = $stmt_count->fetchColumn();
-          if ($count_loai == 0) continue;
+          $sc = $pdo->prepare("SELECT COUNT(*) FROM sanpham WHERE id_loai = ? AND trang_thai = 1");
+          $sc->execute([$l['id_loai']]);
+          $cnt = $sc->fetchColumn();
+          if ($cnt == 0) continue;
         ?>
-        <a href="sanpham.php?loai=<?= $l['id_loai'] ?>&sort=<?= $sort ?>"
+        <a href="sanpham.php?loai=<?= $l['id_loai'] ?>&sort=<?= $sort ?><?= $search ? '&search='.urlencode($search) : '' ?>"
            class="filter-item <?= $loai_filter === $l['id_loai'] ? 'active' : '' ?>">
-          <?= htmlspecialchars($l['ten_loai']) ?>
-          <span class="filter-count"><?= $count_loai ?></span>
+          <?= htmlspecialchars($l['ten_loai']) ?> <span class="filter-count"><?= $cnt ?></span>
         </a>
       <?php endforeach; ?>
     </div>
 
     <div class="filter-box">
-      <h3>⭐ Nổi Bật</h3>
-      <a href="sanpham.php?loai=<?= $loai_filter ?>&sort=ban_chay" class="filter-item <?= $sort==='ban_chay' ? 'active':'' ?>">Bán Chạy Nhất</a>
-      <a href="sanpham.php?loai=<?= $loai_filter ?>&sort=moi_nhat" class="filter-item <?= $sort==='moi_nhat' ? 'active':'' ?>">Mới Nhất</a>
-      <a href="sanpham.php?loai=<?= $loai_filter ?>&sort=gia_tang"  class="filter-item <?= $sort==='gia_tang'  ? 'active':'' ?>">Giá Thấp → Cao</a>
-      <a href="sanpham.php?loai=<?= $loai_filter ?>&sort=gia_giam"  class="filter-item <?= $sort==='gia_giam'  ? 'active':'' ?>">Giá Cao → Thấp</a>
+      <h3>⭐ Sắp Xếp</h3>
+      <?php
+        $sorts = ['ban_chay'=>'Bán Chạy Nhất','moi_nhat'=>'Mới Nhất','gia_tang'=>'Giá Thấp → Cao','gia_giam'=>'Giá Cao → Thấp'];
+        foreach ($sorts as $k => $label):
+      ?>
+        <a href="sanpham.php?loai=<?= $loai_filter ?>&sort=<?= $k ?><?= $search ? '&search='.urlencode($search) : '' ?>"
+           class="filter-item <?= $sort===$k ? 'active' : '' ?>">
+          <?= $label ?>
+        </a>
+      <?php endforeach; ?>
     </div>
   </aside>
 
@@ -396,135 +339,122 @@ include 'includes/header.php';
         <span>Hiển thị <?= count($products) ?> / <?= $total ?> sản phẩm</span>
       </div>
       <select class="sort-select" onchange="window.location=this.value">
-        <option value="sanpham.php?loai=<?= $loai_filter ?>&sort=ban_chay" <?= $sort==='ban_chay'?'selected':'' ?>>Bán Chạy Nhất</option>
-        <option value="sanpham.php?loai=<?= $loai_filter ?>&sort=moi_nhat" <?= $sort==='moi_nhat'?'selected':'' ?>>Mới Nhất</option>
-        <option value="sanpham.php?loai=<?= $loai_filter ?>&sort=gia_tang"  <?= $sort==='gia_tang'?'selected':'' ?>>Giá Thấp → Cao</option>
-        <option value="sanpham.php?loai=<?= $loai_filter ?>&sort=gia_giam"  <?= $sort==='gia_giam'?'selected':'' ?>>Giá Cao → Thấp</option>
+        <?php foreach ($sorts as $k => $label): ?>
+          <option value="sanpham.php?loai=<?= $loai_filter ?>&sort=<?= $k ?><?= $search ? '&search='.urlencode($search) : '' ?>"
+                  <?= $sort===$k ? 'selected' : '' ?>>
+            <?= $label ?>
+          </option>
+        <?php endforeach; ?>
       </select>
     </div>
 
-    <!-- LƯỚI SẢN PHẨM -->
     <div class="products-grid-full">
       <?php if (!empty($products)): ?>
-        <?php foreach ($products as $p): ?>
-          <?php
-            $hinh = resolveImagePath($p['hinh_chinh'] ?? null);
-
-            $het_hang = ($p['so_luong_ton'] <= 0);
-
-            $badge = '';
-            if ($p['ban_chay'])  $badge = '<span class="product-badge" style="background:var(--green-mid)">Bán Chạy</span>';
-            if ($p['hang_moi'])  $badge = '<span class="product-badge">Mới</span>';
-            if ($p['noi_bat'])   $badge = '<span class="product-badge hot">⭐ Nổi Bật</span>';
-          ?>
-          <div class="product-card <?= $het_hang ? 'out-of-stock' : '' ?>">
-            <?= $badge ?>
-            <?php if ($het_hang): ?>
-              <span class="product-badge" style="background:#999;top:48px;">Hết Hàng</span>
-            <?php endif; ?>
-
-            <div class="product-img-wrap" 
-     onclick="window.location='chitietsanpham.php?id=<?= $p['id_sp'] ?>'"
-     style="cursor:pointer;">
-              <?php if ($p['phan_tram_giam'] > 0): ?>
-                <span class="discount-badge">-<?= $p['phan_tram_giam'] ?>%</span>
-              <?php endif; ?>
-              <img src="<?= $hinh ?>"
-                   alt="<?= htmlspecialchars($p['ten_sp']) ?>"
-                   onerror="this.onerror=null;this.src='/rice4u/asset/images/default.jpg'">
-            </div>
-            <div class="product-body product-body--compact">
-              <h3 class="product-name"><?= htmlspecialchars($p['ten_sp']) ?></h3>
-              <div class="product-footer product-footer--centered">
-                <div class="product-price">
-                  <?= formatGia($p['gia_ban']) ?>
-                  <?php if ($p['gia_goc']): ?>
-                    <small style="text-decoration:line-through;color:#bbb;"><?= formatGia($p['gia_goc']) ?></small>
-                  <?php else: ?>
-                    <small>/ 1kg</small>
-                  <?php endif; ?>
-                </div>
-                <button class="btn-add btn-add--large"
-                  <?= $het_hang ? 'disabled' : "onclick=\"themVaoGio('{$p['id_sp']}')\"" ?>>
-                  <?php if ($het_hang): ?>
-                    Hết Hàng
-                  <?php else: ?>
-                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
-                    Thêm Vào Giỏ
-                  <?php endif; ?>
-                </button>
+        <?php foreach ($products as $p):
+          $hinh    = resolveImagePath($p['hinh_chinh'] ?? null);
+          $het     = ($p['so_luong_ton'] <= 0);
+          $badge   = '';
+          if ($p['ban_chay']) $badge = '<span class="product-badge" style="background:var(--green-mid)">Bán Chạy</span>';
+          if ($p['hang_moi']) $badge = '<span class="product-badge">Mới</span>';
+          if ($p['noi_bat'])  $badge = '<span class="product-badge hot">⭐ Nổi Bật</span>';
+          $giam = ($p['phan_tram_giam'] > 0) ? '<span class="discount-badge">-'.$p['phan_tram_giam'].'%</span>' : '';
+        ?>
+        <div class="product-card <?= $het ? 'out-of-stock' : '' ?>">
+          <?= $badge ?>
+          <div class="product-img-wrap"
+               onclick="window.location='/rice4u/chitietsanpham.php?id=<?= $p['id_sp'] ?>'">
+            <?= $giam ?>
+            <img src="<?= $hinh ?>" alt="<?= htmlspecialchars($p['ten_sp']) ?>"
+                 onerror="this.onerror=null;this.src='/rice4u/asset/images/default.jpg'">
+          </div>
+          <div class="product-body--compact">
+            <h3 class="product-name"
+                onclick="window.location='/rice4u/chitietsanpham.php?id=<?= $p['id_sp'] ?>'">
+              <?= htmlspecialchars($p['ten_sp']) ?>
+            </h3>
+            <div class="product-footer--centered">
+              <div class="product-price">
+                <?= formatGia($p['gia_ban']) ?>
+                <?php if ($p['gia_goc']): ?>
+                  <small style="text-decoration:line-through;color:#aaa;font-size:.8em;"><?= formatGia($p['gia_goc']) ?></small>
+                <?php else: ?>
+                  <small style="color:#aaa;font-size:.8em;">/ 1kg</small>
+                <?php endif; ?>
               </div>
+              <?php if (!$het): ?>
+                <button class="btn-add btn-add--large" onclick="themVaoGio('<?= $p['id_sp'] ?>')">
+                  + Giỏ
+                </button>
+              <?php else: ?>
+                <span style="font-size:.75rem;color:#aaa;">Hết hàng</span>
+              <?php endif; ?>
             </div>
           </div>
+        </div>
         <?php endforeach; ?>
+
       <?php else: ?>
-        <div class="empty-state">
-          <p>🌾</p>
-          <p>Không có sản phẩm nào trong danh mục này.</p>
+        <div class="empty-search">
+          <div style="font-size:3rem;margin-bottom:12px;">🌾</div>
+          <h3>Không tìm thấy sản phẩm nào<?= $search ? " cho \"" . htmlspecialchars($search) . "\"" : '' ?></h3>
+          <p>Thử tìm với từ khoá khác hoặc xem tất cả sản phẩm.</p>
+          <a href="/rice4u/sanpham.php">Xem tất cả sản phẩm</a>
         </div>
       <?php endif; ?>
     </div>
 
-    <!-- PHÂN TRANG -->
+    <!-- PAGINATION -->
     <?php if ($total_pages > 1): ?>
     <div class="pagination">
-      <!-- Trang trước -->
-      <a href="sanpham.php?loai=<?= $loai_filter ?>&sort=<?= $sort ?>&page=<?= $page-1 ?>"
-         class="page-btn <?= $page <= 1 ? 'disabled' : '' ?>">‹</a>
-
       <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-        <?php if ($i == 1 || $i == $total_pages || abs($i - $page) <= 2): ?>
-          <a href="sanpham.php?loai=<?= $loai_filter ?>&sort=<?= $sort ?>&page=<?= $i ?>"
-             class="page-btn <?= $i == $page ? 'active' : '' ?>"><?= $i ?></a>
-        <?php elseif (abs($i - $page) == 3): ?>
-          <span class="page-btn disabled">…</span>
+        <?php
+          $link = "sanpham.php?loai=$loai_filter&sort=$sort&page=$i" . ($search ? '&search='.urlencode($search) : '');
+        ?>
+        <?php if ($i === $page): ?>
+          <span class="active"><?= $i ?></span>
+        <?php else: ?>
+          <a href="<?= $link ?>"><?= $i ?></a>
         <?php endif; ?>
       <?php endfor; ?>
-
-      <!-- Trang sau -->
-      <a href="sanpham.php?loai=<?= $loai_filter ?>&sort=<?= $sort ?>&page=<?= $page+1 ?>"
-         class="page-btn <?= $page >= $total_pages ? 'disabled' : '' ?>">›</a>
     </div>
     <?php endif; ?>
 
   </main>
 </div>
 
-<!-- FOOTER rút gọn -->
-<!-- <footer>
-  <div class="footer-bottom" style="max-width:100%;padding:28px 5%;">
-    <p>© 2026 <span>rice4u</span> – Tinh Hoa Đất Việt. Bảo lưu mọi quyền.</p>
-    <a href="trangchu.php" style="font-size:0.85rem;color:var(--green-dark);text-decoration:none;">← Về Trang Chủ</a>
-  </div>
-</footer> -->
+<?php include 'includes/footer.php'; ?>
 
 <script>
-  function themVaoGio(idSp) {
-    const btn = event.currentTarget;
-    const orig = btn.innerHTML;
-    btn.innerHTML = '✓ Đã Thêm';
-    btn.style.background = '#237227';
-    setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; }, 1800);
-
-    const body = new URLSearchParams({ id_sp: idSp, so_luong: '1' }).toString();
-    fetch('/rice4u/api/giohang.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-      body
-    })
-    .then(r => r.ok ? r.json() : null)
-    .then(data => {
-      if (!data || !data.success) return;
+function themVaoGio(id_sp) {
+  fetch('/rice4u/api/giohang.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'action=add&id_sp=' + encodeURIComponent(id_sp) + '&so_luong=1'
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
       const badge = document.getElementById('cart-count');
-      if (badge && typeof data.total_items !== 'undefined') {
-        badge.textContent = data.total_items;
-      }
-    })
-    .catch(() => {});
+      if (badge) badge.textContent = data.total_items ?? '';
+      showToast('✅ Đã thêm vào giỏ hàng!');
+    }
+  })
+  .catch(() => {});
+}
+
+function showToast(msg) {
+  let t = document.getElementById('sp-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'sp-toast';
+    t.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#237227;color:#fff;padding:12px 28px;border-radius:30px;font-size:.9rem;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.15);transition:opacity .3s';
+    document.body.appendChild(t);
   }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.style.opacity = '0', 2200);
+}
 </script>
 </body>
 </html>
-<?php include 'includes/footer.php'; ?>
-
-

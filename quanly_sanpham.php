@@ -1,839 +1,262 @@
 <?php
 session_start();
 require_once("includes/db.php");
+if (!isset($_SESSION['ma_tk']) || $_SESSION['vai_tro'] !== 'admin') { header("Location: dangnhap.php"); exit(); }
 
-/* Kiểm tra vai trò Admin */
-if (!isset($_SESSION['ma_tk']) || $_SESSION['vai_tro'] !== 'admin') {
-    header("Location: dangnhap.php");
-    exit();
-}
-
-/* Lấy danh sách sản phẩm */
-$search = trim($_GET['search'] ?? '');
+$search      = trim($_GET['search']      ?? '');
 $filter_loai = trim($_GET['filter_loai'] ?? '');
-
-$sql = "SELECT sp.*, lg.ten_loai FROM sanpham sp 
-        LEFT JOIN loaigao lg ON sp.id_loai = lg.id_loai 
-        WHERE 1=1";
+$sql    = "SELECT sp.*, lg.ten_loai, ha.duong_dan AS hinh_chinh
+           FROM sanpham sp
+           LEFT JOIN loaigao   lg ON sp.id_loai = lg.id_loai
+           LEFT JOIN hinhanh_sp ha ON sp.id_sp  = ha.id_sp AND ha.la_anh_chinh = 1
+           WHERE 1=1";
 $params = [];
-
-if ($search) {
-    $sql .= " AND sp.ten_sp LIKE ?";
-    $params[] = '%' . $search . '%';
-}
-
-if ($filter_loai) {
-    $sql .= " AND sp.id_loai = ?";
-    $params[] = $filter_loai;
-}
-
+if ($search)      { $sql .= " AND sp.ten_sp LIKE ?"; $params[] = '%'.$search.'%'; }
+if ($filter_loai) { $sql .= " AND sp.id_loai = ?";  $params[] = $filter_loai; }
 $sql .= " ORDER BY sp.id_sp DESC";
-
-$stmt = $pdo->prepare($sql);
-$stmt->execute($params);
+$stmt = $pdo->prepare($sql); $stmt->execute($params);
 $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-/* Lấy danh sách loại gạo */
-$sql_loai = "SELECT id_loai, ten_loai FROM loaigao WHERE trang_thai = 1";
-$stmt_loai = $pdo->query($sql_loai);
+$stmt_loai = $pdo->query("SELECT id_loai, ten_loai FROM loaigao WHERE trang_thai = 1 ORDER BY ten_loai");
 $loai_list = $stmt_loai->fetchAll(PDO::FETCH_ASSOC);
+
+$page_title   = 'Quản lý sản phẩm – Rice4U Admin';
+$active_admin = 'sanpham';
+include 'includes/admin_topbar.php';
 ?>
+<style>
+  .toolbar{background:#fff;border-radius:12px;padding:16px 20px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px;box-shadow:0 2px 8px rgba(0,0,0,.06);}
+  .toolbar label{font-size:12px;color:#555;display:block;margin-bottom:5px;font-weight:600;}
+  .toolbar input,.toolbar select{padding:9px 13px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;outline:none;font-family:inherit;min-width:190px;}
+  .toolbar input:focus,.toolbar select:focus{border-color:#2e7d32;}
+  .btn-search{padding:9px 20px;background:#2e7d32;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:14px;}
+  .btn-add{background:#f9a825;color:#fff;padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:15px;}
+  .admin-card table{width:100%;border-collapse:collapse;}
+  .admin-card thead th{background:#1b5e20;color:#fff;padding:14px 12px;font-size:13px;font-weight:600;text-align:left;}
+  .admin-card tbody td{padding:11px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;vertical-align:middle;}
+  .admin-card tbody tr:hover{background:#fafafa;}
+  .product-img{width:50px;height:50px;object-fit:cover;border-radius:8px;border:1px solid #eee;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;}
+  .badge-on{background:#e8f5e9;color:#2e7d32;}.badge-off{background:#fce4ec;color:#c62828;}
+  .badge-star{background:#fff8e1;color:#e65100;}
+  .btn-action{padding:5px 11px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;transition:all .2s;margin-right:3px;}
+  .btn-edit{background:#e3f2fd;color:#1565c0;}.btn-edit:hover{background:#1565c0;color:#fff;}
+  .btn-del{background:#fce4ec;color:#e53935;}.btn-del:hover{background:#e53935;color:#fff;}
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;align-items:center;justify-content:center;padding:20px;}
+  .modal-overlay.show{display:flex;}
+  .modal{background:#fff;border-radius:14px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);animation:mIn .25s ease;}
+  @keyframes mIn{from{opacity:0;transform:translateY(-16px) scale(.97)}to{opacity:1;transform:none}}
+  .modal-hd{padding:18px 22px 14px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;z-index:1;}
+  .modal-hd h3{font-size:17px;color:#1b5e20;}
+  .modal-close{background:none;border:none;font-size:24px;cursor:pointer;color:#888;line-height:1;}
+  .modal-close:hover{color:#e53935;}
+  .modal-body{padding:22px;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px;}
+  .form-grid .full{grid-column:1/-1;}
+  .fg{display:flex;flex-direction:column;gap:5px;}
+  .fg label{font-size:13px;font-weight:600;color:#444;}
+  .fg input,.fg select,.fg textarea{padding:10px 13px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;font-family:inherit;outline:none;}
+  .fg input:focus,.fg select:focus,.fg textarea:focus{border-color:#2e7d32;}
+  .fg textarea{resize:vertical;min-height:76px;}
+  .cb-group{display:flex;flex-wrap:wrap;gap:16px;padding:8px 0;}
+  .cb-item{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;}
+  .cb-item input{width:15px;height:15px;accent-color:#2e7d32;}
+  .img-preview{display:flex;flex-wrap:wrap;gap:8px;margin-top:7px;}
+  .img-preview img{width:66px;height:66px;object-fit:cover;border-radius:7px;border:2px solid #eee;}
+  .modal-ft{padding:14px 22px 18px;display:flex;justify-content:flex-end;gap:10px;border-top:1px solid #eee;position:sticky;bottom:0;background:#fff;}
+  .btn-save{padding:10px 28px;background:#2e7d32;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:15px;}
+  .btn-save:hover{background:#1b5e20;}
+  .btn-cancel{padding:10px 20px;background:#f5f5f5;color:#555;border:none;border-radius:8px;cursor:pointer;font-weight:600;}
+  .req{color:#e53935;}
+  .empty-state{text-align:center;padding:56px 20px;color:#aaa;}
+</style>
 
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Quản lý sản phẩm</title>
-
-    <style>
-        body{
-            font-family: 'Be Vietnam Pro', Arial, sans-serif;
-            background:#f6f9f6;
-            margin:0;
-            font-size:16px; 
-            color: #237227;
-        }
-
-        .sidebar{
-            width:230px;
-            height:100vh;
-            background:var(--green-dark);
-            position:fixed;
-            color: #237227;
-            padding-top:10px;
-            box-shadow:3px 0 10px rgba(0,0,0,0.08);
-        }
-
-        .sidebar h2{
-            text-align:center;
-            padding:20px 0;
-            font-family:'Playfair Display', serif;
-            letter-spacing:1px;
-        }
-
-        .sidebar a{
-            display:block;
-            padding:12px 20px;
-            color: #237227;
-            text-decoration:none;
-            font-size:14px;
-            transition:all 0.25s;
-            border-left:3px solid transparent;
-        }
-
-        .sidebar a:hover, .sidebar a.active{
-            background:rgba(255,255,255,0.1);
-            border-left:3px solid var(--amber);
-        }
-
-        .content{
-            margin-left:230px;
-            padding:25px;
-        }
-
-        .logo{
-            text-align:center;
-            padding:15px 10px;
-        }
-
-        .logo img{
-            width:150px;
-            height:auto;
-        }
-
-        .header{
-            background:linear-gradient(90deg,var(--green-dark),var(--green-mid));
-            color: white;
-            padding:16px 20px;
-            border-radius:8px;
-            font-weight:600;
-            margin-bottom:20px;
-            box-shadow:0 3px 10px rgba(0,0,0,0.08);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .header h2{
-            margin: 0;
-            font-size: 24px;
-        }
-
-        .header p {
-            margin: 5px 0 0 0;
-            font-size: 13px;
-            opacity: 0.9;
-            color: white;
-        }
-
-        .add-button{
-            background: var(--amber);
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 16px;
-            transition: all 0.25s;
-        }
-
-        .add-button:hover{
-            background: #f4b942;
-            transform: scale(1.05);
-        }
-
-        .table-card{
-            background:#fff;
-            border-radius:14px;
-            box-shadow:0 3px 14px rgba(0,0,0,.08);
-            overflow:hidden;
-            margin-top: 20px;
-        }
-
-        table{
-            width:100%;
-            border-collapse:collapse;
-        }
-
-        th{
-            background:var(--green-dark);
-            color:white;
-            padding:16px 12px;
-            font-weight:600;
-            font-size:15px;
-            text-align: left;
-        }
-
-        td{
-            padding:12px;
-            border-bottom:1px solid #f0f0f0;
-            font-size:14px;
-        }
-
-        tr:hover{
-            background:#fafafa;
-        }
-
-        .btn{
-            display:inline-block;
-            padding:6px 12px;
-            background:#FFD786;
-            color:white;
-            text-decoration:none;
-            border-radius:6px;
-            font-size:13px;
-            font-weight:600;
-            transition:.25s;
-            border: none;
-            cursor: pointer;
-        }
-
-        .btn:hover{
-            background:#f4b942;
-            transform:scale(1.05);
-        }
-
-        .btn-delete{
-            background: #e74c3c;
-        }
-
-        .btn-delete:hover{
-            background: #c0392b;
-        }
-
-        .btn-small{
-            padding: 6px 10px;
-            font-size: 12px;
-            margin-right: 5px;
-        }
-
-        .status-active{
-            color: #27ae60;
-            font-weight: 600;
-        }
-
-        .status-inactive{
-            color: #e74c3c;
-            font-weight: 600;
-        }
-
-        .image-thumb{
-            width: 50px;
-            height: 50px;
-            object-fit: cover;
-            border-radius: 4px;
-        }
-
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.6);
-        }
-
-        .modal.show {
-            display: block;
-        }
-
-        .modal-content {
-            background-color: #fff;
-            margin: 5% auto;
-            padding: 0;
-            border-radius: 8px;
-            width: 90%;
-            max-width: 600px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-
-        .modal-header {
-            padding: 20px;
-            background: linear-gradient(90deg,var(--green-dark),var(--green-mid));
-            color: white;
-            font-weight: 600;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #ddd;
-        }
-
-        .close {
-            color: white;
-            font-size: 24px;
-            font-weight: bold;
-            cursor: pointer;
-            background: none;
-            border: none;
-        }
-
-        .close:hover {
-            color: #e8e8e8;
-        }
-
-        .modal-body {
-            padding: 20px;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: #237227;
-        }
-
-        .form-group input,
-        .form-group textarea,
-        .form-group select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 14px;
-            box-sizing: border-box;
-            font-family: inherit;
-        }
-
-        .form-group textarea {
-            resize: vertical;
-            min-height: 80px;
-        }
-
-        .form-group input:focus,
-        .form-group textarea:focus,
-        .form-group select:focus {
-            outline: none;
-            border-color: var(--green-dark);
-            box-shadow: 0 0 5px rgba(35, 114, 39, 0.3);
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-
-        .modal-footer {
-            padding: 15px 20px;
-            border-top: 1px solid #ddd;
-            text-align: right;
-            background: #f9f9f9;
-        }
-
-        .btn-cancel {
-            background: #bdc3c7;
-            margin-right: 10px;
-        }
-
-        .btn-cancel:hover {
-            background: #95a5a6;
-        }
-
-        .btn-submit {
-            background: var(--green-dark);
-            color: white;
-        }
-
-        .btn-submit:hover {
-            background: var(--green-mid);
-        }
-
-        .alert {
-            padding: 12px 15px;
-            margin-bottom: 15px;
-            border-radius: 6px;
-            font-weight: 500;
-        }
-
-        .alert-success {
-            background: #d5f4e6;
-            color: #27ae60;
-            border-left: 4px solid #27ae60;
-        }
-
-        .alert-error {
-            background: #fadbd8;
-            color: #c0392b;
-            border-left: 4px solid #c0392b;
-        }
-
-        .no-data {
-            text-align: center;
-            padding: 40px;
-            color: #7f8c8d;
-        }
-
-        .search-filter {
-            background: #fff;
-            padding: 15px 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
-            display: flex;
-            gap: 15px;
-            align-items: flex-end;
-            flex-wrap: wrap;
-        }
-
-        .search-filter .form-group {
-            margin-bottom: 0;
-            flex: 1;
-            min-width: 200px;
-        }
-
-        .search-filter input,
-        .search-filter select {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 14px;
-            box-sizing: border-box;
-        }
-
-        .search-filter .btn-search {
-            padding: 10px 20px;
-            background: var(--green-dark);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: 0.25s;
-        }
-
-        .search-filter .btn-search:hover {
-            background: var(--green-mid);
-        }
-
-        .image-preview-item {
-            position: relative;
-            width: 80px;
-            height: 80px;
-            border: 2px solid #ddd;
-            border-radius: 6px;
-            overflow: hidden;
-            background: #f9f9f9;
-        }
-
-        .image-preview-item img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .image-preview-item .remove-image {
-            position: absolute;
-            top: 0;
-            right: 0;
-            background: rgba(231, 76, 60, 0.9);
-            color: white;
-            border: none;
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
-            font-size: 14px;
-            padding: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .image-preview-item .remove-image:hover {
-            background: rgba(192, 57, 43, 1);
-        }
-    </style>
-
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Be+Vietnam+Pro:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/rice4u/asset/header.css">
-</head>
-
-<body>
-    <div class="sidebar">
-        <div class="logo">
-            <a href="admin.php" style="text-decoration: none; color: inherit;">
-                <img src="asset/images/logo.png" alt="Rice4U">
-            </a>
-        </div>
-        <a href="admin.php">📊 Dashboard</a>
-        <a href="quanlydonhang.php">📦 Quản lý đơn hàng</a>
-        <a href="quanly_sanpham.php" class="active">🍚 Quản lý sản phẩm</a>
-        <a href="admin_account.php">👥 Quản lý tài khoản</a>
-        <a href="#">🏷️ Quản lý loại gạo</a>
-        <a href="dangxuat.php">🚪 Đăng xuất</a>
+<div class="admin-page">
+  <div class="admin-page-header">
+    <div>
+      <h1>🍚 Quản lý sản phẩm</h1>
+      <p>Tổng: <strong><?= count($products) ?></strong> sản phẩm<?= ($search||$filter_loai)?' (đang lọc)':'' ?></p>
     </div>
-
-    <div class="content">
-        <div class="header">
-            <div>
-                <h2>Quản lý sản phẩm</h2>
-                <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">
-                    Tổng: <strong><?= count($products) ?></strong> sản phẩm 
-                    <?php if ($search || $filter_loai): ?>
-                        <span>(Kết quả tìm kiếm)</span>
-                    <?php endif; ?>
-                </p>
-            </div>
-            <button class="add-button" onclick="openAddModal()">+ Thêm sản phẩm</button>
-        </div>
-
-        <div id="message"></div>
-
-        <div class="search-filter">
-            <form method="GET" style="display: flex; gap: 15px; flex-wrap: wrap; flex: 1; align-items: flex-end;">
-                <div class="form-group">
-                    <label for="search">Tìm kiếm:</label>
-                    <input type="text" id="search" name="search" placeholder="Nhập tên sản phẩm..." value="<?= htmlspecialchars($search) ?>">
-                </div>
-                <div class="form-group">
-                    <label for="filter_loai">Lọc theo loại:</label>
-                    <select id="filter_loai" name="filter_loai">
-                        <option value="">-- Tất cả loại --</option>
-                        <?php foreach ($loai_list as $loai): ?>
-                            <option value="<?= htmlspecialchars($loai['id_loai']) ?>" 
-                                <?= $filter_loai === $loai['id_loai'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($loai['ten_loai']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <button type="submit" class="btn-search">🔍 Tìm kiếm</button>
-                <?php if ($search || $filter_loai): ?>
-                    <a href="quanly_sanpham.php" style="text-decoration: none;">
-                        <button type="button" class="btn-search" style="background: #95a5a6;">Reset</button>
-                    </a>
-                <?php endif; ?>
-            </form>
-        </div>
-            <?php if (count($products) > 0): ?>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Tên sản phẩm</th>
-                            <th>Loại</th>
-                            <th>Giá bán (₫)</th>
-                            <th>Tồn kho</th>
-                            <th>Trạng thái</th>
-                            <th>Thao tác</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($products as $product): ?>
-                            <tr>
-                                <td>#<?= htmlspecialchars($product['id_sp']) ?></td>
-                                <td><?= htmlspecialchars($product['ten_sp']) ?></td>
-                                <td><?= htmlspecialchars($product['ten_loai'] ?? 'N/A') ?></td>
-                                <td><?= number_format($product['gia_ban'], 0, ',', '.') ?></td>
-                                <td><?= htmlspecialchars($product['so_luong_ton']) ?></td>
-                                <td>
-                                    <span class="<?= $product['trang_thai'] ? 'status-active' : 'status-inactive' ?>">
-                                        <?= $product['trang_thai'] ? 'Hiện' : 'Ẩn' ?>
-                                    </span>
-                                </td>
-                                <td>
-                                    <button class="btn btn-small" onclick="openEditModal(<?= htmlspecialchars(json_encode($product), ENT_QUOTES, 'UTF-8') ?>)">Sửa</button>
-                                    <button class="btn btn-small btn-delete" onclick="deleteProduct(<?= htmlspecialchars($product['id_sp']) ?>)">Xóa</button>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            <?php else: ?>
-                <div class="no-data">
-                    <p>Chưa có sản phẩm nào. <a href="#" onclick="openAddModal(); return false;" style="color: var(--green-dark); font-weight: 600;">Thêm sản phẩm mới</a></p>
-                </div>
-            <?php endif; ?>
-        </div>
+    <div class="header-actions">
+      <button class="btn-add" onclick="openAdd()">+ Thêm sản phẩm</button>
     </div>
+  </div>
 
-    <!-- Modal Thêm/Sửa Sản Phẩm -->
-    <div id="productModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modalTitle">Thêm sản phẩm</h2>
-                <button class="close" onclick="closeModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="productForm">
-                    <input type="hidden" id="productId" name="id_sp">
-                    
-                    <div class="form-group">
-                        <label for="tenSp">Tên sản phẩm *</label>
-                        <input type="text" id="tenSp" name="ten_sp" required>
-                    </div>
+  <div id="msg"></div>
 
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="idLoai">Loại gạo *</label>
-                            <select id="idLoai" name="id_loai" required>
-                                <option value="">-- Chọn loại gạo --</option>
-                                <?php foreach ($loai_list as $loai): ?>
-                                    <option value="<?= htmlspecialchars($loai['id_loai']) ?>">
-                                        <?= htmlspecialchars($loai['ten_loai']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="xuatXu">Xuất xứ</label>
-                            <input type="text" id="xuatXu" name="xuat_xu" placeholder="VD: Việt Nam">
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="giaBan">Giá bán (₫) *</label>
-                            <input type="number" id="giaBan" name="gia_ban" step="1000" min="0" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="giaGoc">Giá gốc (₫)</label>
-                            <input type="number" id="giaGoc" name="gia_goc" step="1000" min="0">
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="phanTramGiam">Giảm giá (%)</label>
-                            <input type="number" id="phanTramGiam" name="phan_tram_giam" min="0" max="100" value="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="soLuongTon">Số lượng tồn kho *</label>
-                            <input type="number" id="soLuongTon" name="so_luong_ton" min="0" required>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="moTaNgan">Mô tả ngắn</label>
-                        <textarea id="moTaNgan" name="mo_ta_ngan" placeholder="Mô tả sản phẩm ngắn gọn..."></textarea>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="hinhAnhSp">📸 Hình ảnh sản phẩm</label>
-                        <input type="file" id="hinhAnhSp" name="hinh_anh[]" multiple accept="image/*" style="padding: 8px;">
-                        <small style="display: block; margin-top: 5px; color: #7f8c8d;">
-                            Chọn một hoặc nhiều ảnh (JPG, PNG, WEBP). Ảnh đầu tiên sẽ là ảnh chính.
-                        </small>
-                        <div id="imagePreview" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;"></div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="noiBat">
-                                <input type="checkbox" id="noiBat" name="noi_bat" value="1"> Sản phẩm nổi bật
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label for="hangMoi">
-                                <input type="checkbox" id="hangMoi" name="hang_moi" value="1"> Hàng mới
-                            </label>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="trangThai">
-                            <input type="checkbox" id="trangThai" name="trang_thai" value="1" checked> Hiển thị sản phẩm
-                        </label>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-cancel" onclick="closeModal()">Hủy</button>
-                <button class="btn btn-submit" onclick="saveProduct()">Lưu</button>
-            </div>
-        </div>
+  <form method="GET" class="toolbar">
+    <div class="fg">
+      <label>Tìm kiếm</label>
+      <input type="text" name="search" placeholder="Tên sản phẩm..." value="<?= htmlspecialchars($search) ?>">
     </div>
+    <div class="fg">
+      <label>Loại gạo</label>
+      <select name="filter_loai">
+        <option value="">-- Tất cả --</option>
+        <?php foreach ($loai_list as $l): ?>
+          <option value="<?= htmlspecialchars($l['id_loai']) ?>" <?= $filter_loai===$l['id_loai']?'selected':'' ?>><?= htmlspecialchars($l['ten_loai']) ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <button type="submit" class="btn-search">🔍 Tìm</button>
+    <?php if($search||$filter_loai): ?>
+      <a href="quanly_sanpham.php" style="align-self:flex-end;padding:9px 13px;color:#666;font-size:13px;text-decoration:none;">✕ Xoá lọc</a>
+    <?php endif; ?>
+  </form>
 
-    <script>
-        // Lưu trữ hình ảnh được chọn
-        let selectedImages = [];
+  <div class="admin-card">
+    <?php if (empty($products)): ?>
+      <div class="empty-state"><div style="font-size:2.5rem;margin-bottom:12px;">🌾</div><p>Chưa có sản phẩm nào</p></div>
+    <?php else: ?>
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Ảnh</th><th>Tên sản phẩm</th><th>Loại</th><th>Giá bán</th><th>Tồn kho</th><th>Trạng thái</th><th style="text-align:center">Thao tác</th></tr>
+      </thead>
+      <tbody>
+        <?php foreach ($products as $p):
+          $h = !empty($p['hinh_chinh']) ? '/rice4u/'.ltrim($p['hinh_chinh'],'/') : '/rice4u/asset/images/default.jpg';
+        ?>
+        <tr>
+          <td><code style="font-size:11px"><?= htmlspecialchars($p['id_sp']) ?></code></td>
+          <td><img class="product-img" src="<?= $h ?>" alt="" onerror="this.src='/rice4u/asset/images/default.jpg'"></td>
+          <td>
+            <strong><?= htmlspecialchars($p['ten_sp']) ?></strong>
+            <?php if(!empty($p['xuat_xu'])): ?><br><small style="color:#888"><?= htmlspecialchars($p['xuat_xu']) ?></small><?php endif; ?>
+          </td>
+          <td><?= htmlspecialchars($p['ten_loai']??'—') ?></td>
+          <td><strong><?= number_format($p['gia_ban'],0,',','.') ?>₫</strong>
+            <?php if($p['phan_tram_giam']>0): ?><br><span class="badge badge-star">-<?= $p['phan_tram_giam'] ?>%</span><?php endif; ?>
+          </td>
+          <td><?= number_format($p['so_luong_ton'],0,',','.') ?> kg</td>
+          <td><span class="badge <?= $p['trang_thai']?'badge-on':'badge-off' ?>"><?= $p['trang_thai']?'Đang bán':'Ẩn' ?></span></td>
+          <td style="text-align:center;white-space:nowrap">
+            <button class="btn-action btn-edit" onclick="openEdit('<?= htmlspecialchars($p['id_sp']) ?>')">✏️ Sửa</button>
+            <button class="btn-action btn-del"  onclick="delProduct('<?= htmlspecialchars($p['id_sp']) ?>','<?= htmlspecialchars(addslashes($p['ten_sp'])) ?>')">🗑️ Xóa</button>
+          </td>
+        </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+    <?php endif; ?>
+  </div>
+</div>
 
-        // Xử lý preview hình ảnh
-        document.getElementById('hinhAnhSp').addEventListener('change', function(e) {
-            selectedImages = [];
-            const previewDiv = document.getElementById('imagePreview');
-            previewDiv.innerHTML = '';
+<!-- MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-hd">
+      <h3 id="mTitle">Thêm sản phẩm</h3>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <form id="pForm" enctype="multipart/form-data" onsubmit="return false;">
+      <input type="hidden" id="pId" name="id_sp">
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="fg full"><label>Tên sản phẩm <span class="req">*</span></label><input type="text" id="fTen" name="ten_sp" placeholder="VD: Gạo ST25..." required></div>
+          <div class="fg"><label>Loại gạo <span class="req">*</span></label>
+            <select id="fLoai" name="id_loai" required><option value="">-- Chọn --</option>
+              <?php foreach($loai_list as $l): ?><option value="<?= htmlspecialchars($l['id_loai']) ?>"><?= htmlspecialchars($l['ten_loai']) ?></option><?php endforeach; ?>
+            </select></div>
+          <div class="fg"><label>Xuất xứ</label><input type="text" id="fXuat" name="xuat_xu" placeholder="VD: Sóc Trăng..."></div>
+          <div class="fg"><label>Giá bán (₫/kg) <span class="req">*</span></label><input type="number" id="fGia" name="gia_ban" placeholder="35000" min="0" step="500" required></div>
+          <div class="fg"><label>Giá gốc (₫/kg)</label><input type="number" id="fGoc" name="gia_goc" placeholder="Để trống nếu không giảm" min="0" step="500"></div>
+          <div class="fg"><label>Tồn kho (kg)</label><input type="number" id="fTon" name="so_luong_ton" value="0" min="0" step="0.5"></div>
+          <div class="fg full"><label>Mô tả ngắn</label><textarea id="fMota" name="mo_ta_ngan" rows="2" placeholder="Mô tả hiển thị trên danh sách..."></textarea></div>
+          <div class="fg full">
+            <label>Ảnh sản phẩm <small style="color:#aaa">(JPG/PNG/WEBP – tối đa 5MB)</small></label>
+            <input type="file" id="fAnh" name="hinh_anh[]" accept="image/*" multiple onchange="prevImg(this)">
+            <div class="img-preview" id="imgPrev"></div>
+            <div id="curImgs"></div>
+          </div>
+          <div class="fg full"><label>Tuỳ chọn</label>
+            <div class="cb-group">
+              <label class="cb-item"><input type="checkbox" id="cNoiBat" name="noi_bat" value="1"> ⭐ Nổi bật</label>
+              <label class="cb-item"><input type="checkbox" id="cMoi"    name="hang_moi" value="1"> 🆕 Hàng mới</label>
+              <label class="cb-item"><input type="checkbox" id="cChay"   name="ban_chay" value="1"> 🔥 Bán chạy</label>
+              <label class="cb-item"><input type="checkbox" id="cTT"     name="trang_thai" value="1" checked> ✅ Đang bán</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-ft">
+        <button type="button" class="btn-cancel" onclick="closeModal()">Huỷ</button>
+        <button type="button" class="btn-save" id="bSave" onclick="saveProd()">💾 Lưu</button>
+      </div>
+    </form>
+  </div>
+</div>
 
-            const files = Array.from(e.target.files);
-            
-            files.forEach((file, index) => {
-                // Kiểm tra loại file
-                if (!file.type.startsWith('image/')) {
-                    showMessage('error', 'Vui lòng chỉ chọn file ảnh');
-                    return;
-                }
-
-                // Kiểm tra dung lượng (max 5MB)
-                if (file.size > 5 * 1024 * 1024) {
-                    showMessage('error', 'File ảnh không được vượt quá 5MB');
-                    return;
-                }
-
-                selectedImages.push(file);
-
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    const previewItem = document.createElement('div');
-                    previewItem.className = 'image-preview-item';
-                    previewItem.innerHTML = `
-                        <img src="${event.target.result}" alt="Preview">
-                        <button type="button" class="remove-image" onclick="removeImage(${selectedImages.length - 1})">×</button>
-                    `;
-                    previewDiv.appendChild(previewItem);
-                };
-                reader.readAsDataURL(file);
-            });
-        });
-
-        // Xóa ảnh từ preview
-        function removeImage(index) {
-            selectedImages.splice(index, 1);
-            const fileInput = document.getElementById('hinhAnhSp');
-            const dt = new DataTransfer();
-            selectedImages.forEach(file => dt.items.add(file));
-            fileInput.files = dt.files;
-            // Trigger change event để cập nhật preview
-            const event = new Event('change', { bubbles: true });
-            fileInput.dispatchEvent(event);
-        }
-
-        // Mở modal thêm
-        function openAddModal() {
-            document.getElementById('productForm').reset();
-            document.getElementById('productId').value = '';
-            document.getElementById('modalTitle').textContent = 'Thêm sản phẩm';
-            document.getElementById('imagePreview').innerHTML = '';
-            selectedImages = [];
-            document.getElementById('productModal').classList.add('show');
-        }
-
-        // Mở modal sửa
-        function openEditModal(product) {
-            document.getElementById('productId').value = product.id_sp;
-            document.getElementById('tenSp').value = product.ten_sp;
-            document.getElementById('idLoai').value = product.id_loai || '';
-            document.getElementById('xuatXu').value = product.xuat_xu || '';
-            document.getElementById('giaBan').value = product.gia_ban;
-            document.getElementById('giaGoc').value = product.gia_goc || '';
-            document.getElementById('phanTramGiam').value = product.phan_tram_giam || 0;
-            document.getElementById('soLuongTon').value = product.so_luong_ton;
-            document.getElementById('moTaNgan').value = product.mo_ta_ngan || '';
-            document.getElementById('noiBat').checked = product.noi_bat == 1;
-            document.getElementById('hangMoi').checked = product.hang_moi == 1;
-            document.getElementById('trangThai').checked = product.trang_thai == 1;
-            
-            // Reset file input và preview
-            document.getElementById('hinhAnhSp').value = '';
-            document.getElementById('imagePreview').innerHTML = '';
-            selectedImages = [];
-            
-            document.getElementById('modalTitle').textContent = 'Sửa sản phẩm';
-            document.getElementById('productModal').classList.add('show');
-        }
-
-        // Đóng modal
-        function closeModal() {
-            document.getElementById('productModal').classList.remove('show');
-            document.getElementById('message').innerHTML = '';
-        }
-
-        // Lưu sản phẩm
-        function saveProduct() {
-            const form = document.getElementById('productForm');
-            const formData = new FormData(form);
-            const id = document.getElementById('productId').value;
-            
-            // Thêm các file ảnh vào FormData
-            const fileInput = document.getElementById('hinhAnhSp');
-            if (fileInput.files.length > 0) {
-                // Xóa các file cũ nếu có
-                formData.delete('hinh_anh[]');
-                // Thêm file mới
-                for (let file of selectedImages) {
-                    formData.append('hinh_anh[]', file);
-                }
-            }
-            
-            // Chuyển checkbox thành 0 hoặc 1
-            formData.set('noi_bat', document.getElementById('noiBat').checked ? 1 : 0);
-            formData.set('hang_moi', document.getElementById('hangMoi').checked ? 1 : 0);
-            formData.set('trang_thai', document.getElementById('trangThai').checked ? 1 : 0);
-
-            const action = id ? 'update' : 'add';
-            
-            fetch('api/sanpham_admin.php?action=' + action, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showMessage('success', data.message);
-                    setTimeout(() => {
-                        location.reload();
-                    }, 1500);
-                } else {
-                    showMessage('error', data.message || 'Có lỗi xảy ra');
-                }
-            })
-            .catch(error => {
-                showMessage('error', 'Lỗi kết nối: ' + error.message);
-            });
-        }
-
-        // Xóa sản phẩm
-        function deleteProduct(id) {
-            if (!confirm('Bạn chắc chắn muốn xóa sản phẩm này?')) {
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('id_sp', id);
-
-            fetch('api/sanpham_admin.php?action=delete', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showMessage('success', data.message);
-                    setTimeout(() => {
-                        location.reload();
-                    }, 1500);
-                } else {
-                    showMessage('error', data.message || 'Có lỗi xảy ra');
-                }
-            })
-            .catch(error => {
-                showMessage('error', 'Lỗi kết nối: ' + error.message);
-            });
-        }
-
-        // Hiển thị thông báo
-        function showMessage(type, message) {
-            const msgDiv = document.getElementById('message');
-            msgDiv.innerHTML = '<div class="alert alert-' + type + '">' + message + '</div>';
-            msgDiv.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        // Đóng modal khi click ngoài
-        window.onclick = function(event) {
-            const modal = document.getElementById('productModal');
-            if (event.target == modal) {
-                closeModal();
-            }
-        }
-    </script>
-</body>
-</html>
+<script>
+const modal = document.getElementById('modal');
+function openAdd() {
+  document.getElementById('pId').value = '';
+  document.getElementById('pForm').reset();
+  document.getElementById('imgPrev').innerHTML = '';
+  document.getElementById('curImgs').innerHTML = '';
+  document.getElementById('cTT').checked = true;
+  document.getElementById('mTitle').textContent = '➕ Thêm sản phẩm mới';
+  modal.classList.add('show');
+}
+function openEdit(id) {
+  document.getElementById('mTitle').textContent = '⏳ Đang tải...';
+  modal.classList.add('show');
+  fetch('api/sanpham_admin.php?action=get&id_sp=' + encodeURIComponent(id))
+    .then(r=>r.json()).then(res => {
+      if (!res.success) { showMsg('error', res.message); closeModal(); return; }
+      const p = res.data;
+      document.getElementById('mTitle').textContent = '✏️ Sửa: ' + p.ten_sp;
+      document.getElementById('pId').value    = p.id_sp;
+      document.getElementById('fTen').value   = p.ten_sp||'';
+      document.getElementById('fLoai').value  = p.id_loai||'';
+      document.getElementById('fXuat').value  = p.xuat_xu||'';
+      document.getElementById('fGia').value   = p.gia_ban||'';
+      document.getElementById('fGoc').value   = p.gia_goc||'';
+      document.getElementById('fTon').value   = p.so_luong_ton||0;
+      document.getElementById('fMota').value  = p.mo_ta_ngan||'';
+      document.getElementById('cNoiBat').checked = p.noi_bat==1;
+      document.getElementById('cMoi').checked    = p.hang_moi==1;
+      document.getElementById('cChay').checked   = p.ban_chay==1;
+      document.getElementById('cTT').checked     = p.trang_thai==1;
+      document.getElementById('fAnh').value = '';
+      document.getElementById('imgPrev').innerHTML = '';
+      const ci = document.getElementById('curImgs');
+      if (p.hinh_anh_list&&p.hinh_anh_list.length) {
+        let h = '<span style="font-size:11px;color:#888;display:block;margin-top:6px">Ảnh hiện tại:</span><div class="img-preview">';
+        p.hinh_anh_list.forEach(i => { h += `<img src="/rice4u/${i.duong_dan}" onerror="this.src='/rice4u/asset/images/default.jpg'">`; });
+        ci.innerHTML = h + '</div>';
+      } else ci.innerHTML = '';
+    }).catch(e => { showMsg('error',e.message); closeModal(); });
+}
+function closeModal() { modal.classList.remove('show'); }
+modal.addEventListener('click', e => { if(e.target===modal) closeModal(); });
+function prevImg(input) {
+  const w = document.getElementById('imgPrev'); w.innerHTML = '';
+  Array.from(input.files).forEach(f => { if(!f.type.startsWith('image/')) return; const r=new FileReader(); r.onload=e=>{const i=document.createElement('img');i.src=e.target.result;w.appendChild(i);};r.readAsDataURL(f); });
+}
+function saveProd() {
+  const id=document.getElementById('pId').value.trim(), ten=document.getElementById('fTen').value.trim(), loai=document.getElementById('fLoai').value, gia=document.getElementById('fGia').value;
+  if (!ten)  return showMsg('error','⚠️ Vui lòng nhập tên sản phẩm');
+  if (!loai) return showMsg('error','⚠️ Vui lòng chọn loại gạo');
+  if (!gia||parseFloat(gia)<=0) return showMsg('error','⚠️ Vui lòng nhập giá bán hợp lệ');
+  const d = new FormData(document.getElementById('pForm'));
+  d.set('noi_bat',    document.getElementById('cNoiBat').checked?'1':'0');
+  d.set('hang_moi',   document.getElementById('cMoi').checked   ?'1':'0');
+  d.set('ban_chay',   document.getElementById('cChay').checked  ?'1':'0');
+  d.set('trang_thai', document.getElementById('cTT').checked    ?'1':'0');
+  const btn=document.getElementById('bSave'); btn.disabled=true; btn.textContent='⏳ Đang lưu...';
+  fetch('api/sanpham_admin.php?action='+(id?'update':'add'),{method:'POST',body:d})
+    .then(r=>r.json()).then(res=>{
+      if(res.success){closeModal();showMsg('success',res.message);setTimeout(()=>location.reload(),1800);}
+      else showMsg('error',res.message||'Có lỗi xảy ra');
+    }).catch(e=>showMsg('error','❌ '+e.message))
+    .finally(()=>{btn.disabled=false;btn.textContent='💾 Lưu';});
+}
+function delProduct(id,ten) {
+  if(!confirm(`Xóa sản phẩm:\n"${ten}" (${id})?\n\nKhông thể hoàn tác!`)) return;
+  const d=new FormData(); d.append('id_sp',id);
+  fetch('api/sanpham_admin.php?action=delete',{method:'POST',body:d})
+    .then(r=>r.json()).then(res=>{showMsg(res.success?'success':'error',res.message);if(res.success)setTimeout(()=>location.reload(),1600);})
+    .catch(e=>showMsg('error',e.message));
+}
+function showMsg(t,m){const d=document.getElementById('msg');d.innerHTML=`<div class="alert alert-${t}">${m}</div>`;d.scrollIntoView({behavior:'smooth',block:'nearest'});if(t==='success')setTimeout(()=>d.innerHTML='',5000);}
+</script>
+</body></html>
