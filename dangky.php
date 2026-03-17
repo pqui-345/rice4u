@@ -21,19 +21,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         try {
             $pdo->beginTransaction();
 
-            $stmt1 = $pdo->prepare("INSERT INTO TAI_KHOAN (ten_dang_nhap, mat_khau, vai_tro) VALUES (?, ?, 'khach_hang')");
+            $stmt1 = $pdo->prepare("INSERT INTO TAI_KHOAN (ten_dang_nhap, mat_khau, vai_tro) VALUES (?, ?, 'khachhang')");
             $stmt1->execute([$ten_dang_nhap, $mat_khau]);
             $ma_tk_moi = $pdo->lastInsertId();
 
-            $stmt2 = $pdo->prepare("INSERT INTO KHACH_HANG (ten_kh, sdt, dia_chi, email, ma_tk) VALUES (?, ?, ?, ?, ?)");
+            $stmt2 = $pdo->prepare("INSERT INTO KHACHHANG (ho_ten, so_dien_thoai, dia_chi, email, ma_tk) VALUES (?, ?, ?, ?, ?)");
             $stmt2->execute([$ten_kh, $sdt, $dia_chi, $email, $ma_tk_moi]);
 
             $pdo->commit();
             $thong_bao = "Đăng ký thành công! Hãy đăng nhập.";
         } catch (Exception $e) {
             $pdo->rollBack();
-            $thong_bao = "Lỗi: Tên đăng nhập đã tồn tại hoặc hệ thống gặp sự cố.";
-        }
+$thong_bao = "Lỗi chi tiết: " . $e->getMessage();        }
     }
 }
 
@@ -57,7 +56,7 @@ main::before {
     content: "";
     position: absolute;
     top: -20px; left: -20px; right: -20px; bottom: -20px;
-    background: url('/rice4u/images/bgr.jpg') no-repeat center center;
+    background: url(/rice4u/asset/images/bgr.jpg) no-repeat center center;
     background-size: cover;
     filter: blur(6px);
     z-index: -2;

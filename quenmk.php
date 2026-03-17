@@ -38,20 +38,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Khôi Phục Mật Khẩu - Cửa Hàng Gạo Rice4U</title>
-    <link href="/rice4u/.vscode/asset/header.css" rel="stylesheet">
-    <link href="/rice4u/.vscode/asset/footer.css" rel="stylesheet">
+    <link href="/rice4u/asset/header.css" rel="stylesheet">
+    <link href="/rice4u/asset/footer.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
 
     <style>
         * {
-            font-family: 'Nunito', Arial, Helvetica, sans-serif;
+            font-family: 'Be Vietnam Pro', Arial, Helvetica, sans-serif;
             box-sizing: border-box;
         }
 
         /* --- LAYOUT CHUNG --- */
         body {
-            margin: 0 auto;
             min-height: 100vh;
             display: grid;
             grid-template-rows: auto 1fr auto;
@@ -67,6 +66,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             justify-content: center;
             padding: 3em 1em;
             overflow: hidden;
+            margin-bottom: 20px;
         }
 
         main::before {
@@ -76,7 +76,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             left: -20px;
             right: -20px;
             bottom: -20px;
-            background: url('/rice4u/.vscode/asset/images/bgr.jpg') no-repeat center center;
+            background: url('/rice4u/asset/images/bgr.jpg') no-repeat center center;
             background-size: cover;
             filter: blur(6px);
             z-index: -2;
@@ -126,7 +126,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         .form-group input {
             width: 100%;
-            font-family: 'Nunito', sans-serif;
+            font-family: 'Be Vietnam Pro', Arial, Helvetica, sans-serif;
             box-sizing: border-box;
             transition: all 0.3s ease;
             font-size: 1.2em;
@@ -245,7 +245,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     <header>
         <div class="logo-navi">
-            <a href="./trangchu.php"><img class="logo" src="/rice4u/.vscode/asset/images/logo.png" alt="Logo"></a>
+            <a href="./trangchu.php"><img class="logo" src="/rice4u/asset/images/logo.png" alt="Logo"></a>
             <nav>
                 <ul class="dieu-huong">
                     <li><a href="./trangchu.php">Trang Chủ</a></li>
@@ -328,7 +328,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     <footer>
         <div class="footer-column">
-            <img class="logo" src="/rice4u/.vscode/asset/images/logo.png" alt="Logo">
+            <img class="logo" src="/rice4u/asset/images/logo.png" alt="Logo">
         </div>
         <div class="footer-column">
             <h3>Về chúng tôi</h3>

@@ -29,7 +29,7 @@ if (!empty($_SESSION['gio_hang']) && is_array($_SESSION['gio_hang'])) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= htmlspecialchars($page_title ?? 'Rice4U – Tinh Hoa Gạo Việt') ?></title>
 
-  <link rel="icon" href="/rice4u/.vscode/asset/images/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/rice4u/asset/images/favicon.ico" type="image/x-icon">
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -40,9 +40,9 @@ if (!empty($_SESSION['gio_hang']) && is_array($_SESSION['gio_hang'])) {
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
 
   <!-- CSS chung toàn site -->
-  <link rel="stylesheet" href="/rice4u/.vscode/asset/styles.css">
-  <link rel="stylesheet" href="/rice4u/.vscode/asset/header.css">
-  <link rel="stylesheet" href="/rice4u/.vscode/asset/footer.css">
+<link rel="stylesheet" href="/rice4u/asset/styles.css">
+  <link rel="stylesheet" href="/rice4u/asset/header.css">
+  <link rel="stylesheet" href="/rice4u/asset/footer.css">
 </head>
 
 <body>
@@ -50,7 +50,7 @@ if (!empty($_SESSION['gio_hang']) && is_array($_SESSION['gio_hang'])) {
 <header>
   <div class="logo-navi">
     <a class="logo" href="/rice4u/trangchu.php">
-      <img src="/rice4u/.vscode/asset/images/logo.png" alt="Rice4U Logo">
+      <img src="/rice4u/asset/images/logo.png" alt="Rice4U Logo">
     </a>
     <nav>
       <ul class="dieu-huong">

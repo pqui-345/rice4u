@@ -10,7 +10,7 @@
 
   <div class="footer-column">
     <a href="/rice4u/trangchu.php">
-      <img class="logo" src="/rice4u/.vscode/asset/images/logo.png" alt="Rice4U">
+      <img class="logo" src="/rice4u/asset/images/logo.png" alt="Rice4U">
     </a>
   </div>
 

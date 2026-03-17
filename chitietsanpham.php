@@ -85,20 +85,37 @@ function formatGia($gia) {
     return number_format($gia, 0, ',', '.') . '₫';
 }
 
-function resolveImagePath($path, $default = '/rice4u/.vscode/asset/images/default.jpg') {
+function resolveImagePath($path, $default = '/rice4u/asset/images/default.jpg') {
     if (empty($path)) return $default;
+
     $path = trim((string)$path);
     if (preg_match('#^https?://#i', $path)) return $path;
+
     $normalized = str_replace('\\', '/', ltrim($path, '/'));
     $candidates = [$normalized];
 
-    if (strpos($normalized, '.vscode/asset/') !== 0) {
-        $candidates[] = '.vscode/asset/' . $normalized;
+    if (strpos($normalized, 'asset/') !== 0) {
+        $candidates[] = 'asset/' . $normalized;
+    }
+
+    // Thử tất cả đuôi file phổ biến
+    $dot = strrpos($normalized, '.');
+    if ($dot !== false) {
+        $base = substr($normalized, 0, $dot);
+        foreach (['jpg', 'jpeg', 'png', 'webp'] as $ext) {
+            $candidate = $base . '.' . $ext;
+            $candidates[] = $candidate;
+            if (strpos($candidate, 'asset/') !== 0) {
+                $candidates[] = 'asset/' . $candidate;
+            }
+        }
     }
 
     foreach ($candidates as $candidate) {
-        if (is_file(__DIR__ . '/' . $candidate)) {
-            return '/rice4u/' . ltrim($candidate, '/');
+        $candidate = ltrim($candidate, '/');
+        $candidateFull = __DIR__ . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $candidate);
+        if (is_file($candidateFull)) {
+            return '/rice4u/' . $candidate;
         }
     }
 
@@ -128,10 +145,10 @@ include 'includes/header.php';
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" href="/rice4u/.vscode/asset/images/favicon.ico" type="image/x-icon">
+<link rel="icon" href="/rice4u/asset/images/favicon.ico" type="image/x-icon">
 <title><?= htmlspecialchars($sp['ten_sp']) ?> – Rice4U</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Be+Vietnam+Pro:wght@300;400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/rice4u/.vscode/asset/styles.css">
+<link rel="stylesheet" href="/rice4u/asset/styles.css">
 <style>
 /* ══════════════════════════════════════
    TRANG CHI TIẾT SẢN PHẨM
@@ -610,7 +627,7 @@ include 'includes/header.php';
 <!-- HEADER -->
 <!-- <header>
   <a href="trangchu.php" class="logo">
-    <img src="/rice4u/.vscode/asset/images/logo.png" alt="Rice4U Logo" class="logo-img">
+    <img src="/rice4u/asset/images/logo.png" alt="Rice4U Logo" class="logo-img">
   </a>
   <nav>
     <a href="trangchu.php">Trang Chủ</a>
@@ -660,7 +677,7 @@ include 'includes/header.php';
       <img src="<?= $hinh_main ?>"
            alt="<?= htmlspecialchars($sp['ten_sp']) ?>"
            id="mainImg"
-           onerror="this.onerror=null;this.src='/rice4u/.vscode/asset/images/default.jpg'"
+           onerror="this.onerror=null;this.src='/rice4u/asset/images/default.jpg'"
            onclick="openLightbox(this.src)">
     </div>
 
@@ -672,7 +689,7 @@ include 'includes/header.php';
              onclick="changeMainImg(this, '<?= htmlspecialchars($src) ?>')">
           <img src="<?= $src ?>"
                alt="<?= htmlspecialchars($h['alt_text'] ?? $sp['ten_sp']) ?>"
-               onerror="this.onerror=null;this.src='/rice4u/.vscode/asset/images/default.jpg'">
+               onerror="this.onerror=null;this.src='/rice4u/asset/images/default.jpg'">
         </div>
       <?php endforeach; ?>
     </div>
@@ -922,7 +939,7 @@ include 'includes/header.php';
           <div class="product-img-wrap">
             <img src="<?= $lq_hinh ?>"
                  alt="<?= htmlspecialchars($lq['ten_sp']) ?>"
-                 onerror="this.onerror=null;this.src='/rice4u/.vscode/asset/images/default.jpg'">
+                 onerror="this.onerror=null;this.src='/rice4u/asset/images/default.jpg'">
           </div>
           <div class="product-body product-body--compact">
             <h3 class="product-name"><?= htmlspecialchars($lq['ten_sp']) ?></h3>

@@ -33,20 +33,35 @@ function formatGia($gia) {
     return number_format($gia, 0, ',', '.') . '₫';
 }
 
-function resolveImagePath($path, $default = '/rice4u/.vscode/asset/images/default.jpg') {
+function resolveImagePath($path, $default = '/rice4u/asset/images/default.jpg') {
     if (empty($path)) return $default;
     $path = trim((string)$path);
     if (preg_match('#^https?://#i', $path)) return $path;
+
     $normalized = str_replace('\\', '/', ltrim($path, '/'));
     $candidates = [$normalized];
 
-    if (strpos($normalized, '.vscode/asset/') !== 0) {
-        $candidates[] = '.vscode/asset/' . $normalized;
+    if (strpos($normalized, 'asset/') !== 0) {
+        $candidates[] = 'asset/' . $normalized;
+    }
+
+    // Thử thêm các đuôi file khác nhau (giống sanpham.php)
+    $dot = strrpos($normalized, '.');
+    if ($dot !== false) {
+        $base = substr($normalized, 0, $dot);
+        foreach (['jpg', 'jpeg', 'png', 'webp'] as $ext) {
+            $candidate = $base . '.' . $ext;
+            $candidates[] = $candidate;
+            if (strpos($candidate, 'asset/') !== 0) {
+                $candidates[] = 'asset/' . $candidate;
+            }
+        }
     }
 
     foreach ($candidates as $candidate) {
+        $candidate = ltrim($candidate, '/');
         if (is_file(__DIR__ . '/' . $candidate)) {
-            return '/rice4u/' . ltrim($candidate, '/');
+            return '/rice4u/' . $candidate;
         }
     }
 
@@ -148,7 +163,7 @@ include 'includes/header.php';
                         <?= $giam ?>
                         <img src="<?= $hinh ?>"
                              alt="<?= htmlspecialchars($p['ten_sp']) ?>"
-                             onerror="this.onerror=null;this.src='/rice4u/.vscode/asset/images/default.jpg'">
+                             onerror="this.onerror=null;this.src='/rice4u/asset/images/default.jpg'">
                     </div>
                     <div class="product-body product-body--compact">
                         <h3 class="product-name"
@@ -187,18 +202,18 @@ include 'includes/header.php';
 </section>
 
 <div class="banner-section reveal">
-    <img src="/rice4u/.vscode/asset/images/banner.png" alt="Tinh Hoa Đất Việt – Rice4U">
+    <img src="/rice4u/asset/images/banner.png" alt="Tinh Hoa Đất Việt – Rice4U">
 </div>
 
 <section style="background:var(--white);padding:8px 0;">
     <div class="story-section">
         <div class="story-img-stack reveal">
             <span class="story-leaf">🌿</span>
-            <img src="/rice4u/.vscode/asset/images/default1.jpg" alt="Cánh đồng lúa" class="story-img-main"
-                 onerror="this.onerror=null;this.src='/rice4u/.vscode/asset/images/default.jpg'">
+            <img src="/rice4u/asset/images/default1.jpg" alt="Cánh đồng lúa" class="story-img-main"
+                 onerror="this.onerror=null;this.src='/rice4u/asset/images/default.jpg'">
             <img src="https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600&q=80"
                  alt="Hạt gạo" class="story-img-accent"
-                 onerror="this.onerror=null;this.src='/rice4u/.vscode/asset/images/default.jpg'">
+                 onerror="this.onerror=null;this.src='/rice4u/asset/images/default.jpg'">
         </div>
         <div class="story-content reveal">
             <span class="section-tag">>🌾 Câu Chuyện Gạo Việt</span>
